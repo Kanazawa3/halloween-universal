@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Halloween AR - Leitor Universal</title>
+
+<!-- MindAR / A-Frame: SOMENTE reconhecimento -->
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/DRACOLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+<style>
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  overscroll-behavior:none;
+}
+
+video{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100vh!important;
+  object-fit:cover!important;
+  z-index:0!important;
+  display:block!important;
+  opacity:1!important;
+  visibility:visible!important;
+  background:#000;
+}
+
+a-scene,.a-canvas{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100vh!important;
+  z-index:2!important;
+  background:transparent!important;
+}
+
+.mindar-ui-overlay{z-index:5!important}
+
+/* Viewer 3D separado do MindAR */
+#viewerCanvas{
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100vh;
+  z-index:30;
+  display:none;
+  background:transparent;
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+#status{
+  position:fixed;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  z-index:80;
+  width:min(88vw,440px);
+  box-sizing:border-box;
+  color:#fff;
+  background:rgba(0,0,0,.76);
+  padding:16px 20px;
+  border-radius:16px;
+  font-size:20px;
+  font-weight:700;
+  line-height:1.35;
+  text-align:center;
+  pointer-events:none;
+  backdrop-filter:blur(8px);
+}
+
+#status.ready{
+  top:auto;
+  bottom:18px;
+  transform:translateX(-50%);
+  width:auto;
+  max-width:90vw;
+  padding:10px 14px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:600;
+  white-space:nowrap;
+}
+
+#exitBtn,#retryBtn{
+  position:fixed;
+  top:16px;
+  z-index:100;
+  border:0;
+  border-radius:999px;
+  padding:11px 16px;
+  font-size:14px;
+  font-weight:700;
+  display:none;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+#exitBtn{
+  left:14px;
+  background:rgba(0,0,0,.82);
+  color:#fff;
+}
+
+#retryBtn{
+  right:14px;
+  background:#ffdf6c;
+  color:#111;
+}
+
+#zoomControls{
+  position:fixed;
+  right:16px;
+  bottom:24px;
+  z-index:100;
+  display:none;
+  flex-direction:column;
+  gap:10px;
+}
+
+#zoomControls button{
+  width:58px;
+  height:58px;
+  border:0;
+  border-radius:50%;
+  background:rgba(255,255,255,.96);
+  color:#111;
+  font-size:32px;
+  line-height:1;
+  font-weight:700;
+  box-shadow:0 3px 12px rgba(0,0,0,.30);
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+#debug{
+  display:none;
+  position:fixed;
+  left:8px;
+  right:8px;
+  top:70px;
+  z-index:120;
+  max-height:40vh;
+  overflow:auto;
+  color:#fff;
+  background:rgba(0,0,0,.84);
+  padding:9px 11px;
+  border-radius:10px;
+  font-size:11px;
+  line-height:1.4;
+  white-space:pre-wrap;
+  pointer-events:none;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="viewerCanvas"></canvas>
+
+<div id="debug">Página carregada.</div>
+
+<button id="exitBtn">Sair</button>
+<button id="retryBtn">Tentar novamente</button>
+
+<div id="zoomControls">
+  <button id="zoomInBtn" aria-label="Aumentar zoom">+</button>
+  <button id="zoomOutBtn" aria-label="Diminuir zoom">−</button>
+</div>
+
+<div id="status">Preparando experiência...</div>
+
+<!--
+  Esta cena NÃO contém o diorama.
+  Ela existe somente para câmera + reconhecimento da imagem.
+-->
+<a-scene
+  id="arScene"
+  mindar-image="
+    imageTargetSrc: ./targets.mind;
+    autoStart: false;
+    uiScanning: yes;
+    uiLoading: yes;
+    uiError: yes;
+    warmupTolerance: 3;
+    missTolerance: 10;
+    filterMinCF: 0.0005;
+    filterBeta: 1000;
+  "
+  embedded
+  vr-mode-ui="enabled:false"
+  device-orientation-permission-ui="enabled:false"
+  renderer="alpha:true; antialias:true; colorManagement:true">
+
+  <a-entity id="target0" mindar-image-target="targetIndex:0"></a-entity>
+  <a-entity id="target1" mindar-image-target="targetIndex:1"></a-entity>
+  <a-entity id="target2" mindar-image-target="targetIndex:2"></a-entity>
+  <a-entity id="target3" mindar-image-target="targetIndex:3"></a-entity>
+  <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
+</a-scene>
+
+<script>
+/*
+  VIEWER TOTALMENTE INDEPENDENTE:
+  Three.js e GLTFLoader próprios.
+*/
+
+const MODELS = ["./Bruxa.glb","./Castelo.glb","./Vila.glb","./Cemiterio.glb"];
+const MODEL_NAMES = ["Bruxa","Castelo","Vila","Cemitério"];
+
+const arScene = document.getElementById("arScene");
+const targets = [0,1,2,3].map(i=>document.getElementById("target"+i));
+
+let activeTargetIndex = -1;
+let loadedModelIndex = -1;
+
+const canvas = document.getElementById("viewerCanvas");
+const statusEl = document.getElementById("status");
+const debugEl = document.getElementById("debug");
+const exitBtn = document.getElementById("exitBtn");
+const retryBtn = document.getElementById("retryBtn");
+const zoomControls = document.getElementById("zoomControls");
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+
+const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+if(DEBUG) debugEl.style.display = "block";
+
+let renderer;
+let viewerScene;
+let viewerCamera;
+let modelRoot;
+let model;
+
+let modelReady = false;
+let modelLoading = false;
+let arStarted = false;
+let arReady = false;
+
+let targetSeen = false;
+let dioramaOpen = false;
+let waitingForRearm = false;
+
+let openTimer = null;
+let lostTimer = null;
+
+let baseScale = 1;
+let zoom = 1;
+let rotX = -8;
+let rotY = 0;
+
+/*
+  Posição inicial já aprovada no HTML final.
+  O pan de 2 dedos trabalha em torno deste centro.
+*/
+const MODEL_CENTER_Y = 0.45;
+const PAN_LIMIT_X = 1.50;
+const PAN_LIMIT_Y = 1.20;
+const PAN_SPEED = 0.0045;
+
+let panX = 0;
+let panY = 0;
+
+/*
+  Ponteiros ativos:
+  1 dedo = rotação
+  2 dedos = deslocamento
+*/
+const activePointers = new Map();
+let gestureMode = 0;
+let lastGestureX = 0;
+let lastGestureY = 0;
+
+function log(msg){
+  console.log(msg);
+  if(DEBUG){
+    debugEl.textContent += "\n" + msg;
+    debugEl.scrollTop = debugEl.scrollHeight;
+  }
+}
+
+function setStatus(text){
+  statusEl.textContent = text;
+}
+
+function setScannerUIVisible(visible){
+  /*
+    Esconde somente a animação/marcadores do scanner.
+    O rastreamento do MindAR continua funcionando no fundo.
+  */
+  document.querySelectorAll(".mindar-ui-scanning").forEach(el=>{
+    if(visible){
+      el.style.removeProperty("display");
+    }else{
+      el.style.display = "none";
+    }
+  });
+}
+
+function forceVideoVisible(){
+  document.querySelectorAll("video").forEach(v=>{
+    v.setAttribute("playsinline","");
+    v.setAttribute("autoplay","");
+    v.muted = true;
+
+    Object.assign(v.style,{
+      position:"fixed",
+      inset:"0",
+      width:"100vw",
+      height:"100vh",
+      objectFit:"cover",
+      zIndex:"0",
+      opacity:"1",
+      visibility:"visible",
+      display:"block"
+    });
+
+    if(v.paused){
+      v.play().catch(()=>{});
+    }
+  });
+}
+
+/* ======================================================
+   VIEWER 3D
+   ====================================================== */
+
+function initViewer(){
+  renderer = new THREE.WebGLRenderer({
+    canvas,
+    alpha:true,
+    antialias:true,
+    powerPreference:"high-performance"
+  });
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x000000,0);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+
+  viewerScene = new THREE.Scene();
+
+  viewerCamera = new THREE.PerspectiveCamera(
+    42,
+    window.innerWidth/window.innerHeight,
+    0.01,
+    100
+  );
+
+  viewerCamera.position.set(0,0,4.5);
+  viewerCamera.lookAt(0,0,0);
+
+  /* iluminação mais clara */
+  const ambient = new THREE.HemisphereLight(0xffffff,0x4a4150,2.35);
+  viewerScene.add(ambient);
+
+  const key = new THREE.DirectionalLight(0xffffff,2.4);
+  key.position.set(4,6,5);
+  viewerScene.add(key);
+
+  const fill = new THREE.DirectionalLight(0xffe5ca,1.45);
+  fill.position.set(-5,2,4);
+  viewerScene.add(fill);
+
+  modelRoot = new THREE.Group();
+  modelRoot.visible = false;
+  viewerScene.add(modelRoot);
+
+  resizeViewer();
+
+  renderer.setAnimationLoop(()=>{
+    if(dioramaOpen && modelReady){
+      renderer.render(viewerScene,viewerCamera);
+    }
+  });
+
+  log("Viewer Three.js independente iniciado.");
+}
+
+function resizeViewer(){
+  if(!renderer || !viewerCamera) return;
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  renderer.setSize(w,h,false);
+  viewerCamera.aspect = w/h;
+  viewerCamera.updateProjectionMatrix();
+}
+
+window.addEventListener("resize",resizeViewer);
+
+function resetTransform(){
+  zoom = 1;
+  rotX = -8;
+  rotY = 0;
+  panX = 0;
+  panY = 0;
+
+  activePointers.clear();
+  gestureMode = 0;
+
+  applyTransform();
+}
+
+function applyTransform(){
+  if(!modelRoot) return;
+
+  /*
+    Posição:
+    - centro original preservado
+    - pan de 2 dedos somado ao centro
+  */
+  modelRoot.position.set(
+    panX,
+    MODEL_CENTER_Y + panY,
+    0
+  );
+
+  modelRoot.rotation.set(
+    THREE.MathUtils.degToRad(rotX),
+    THREE.MathUtils.degToRad(rotY),
+    0
+  );
+
+  const s = baseScale * zoom;
+  modelRoot.scale.set(s,s,s);
+}
+
+function centerAndFitModel(){
+  model.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(model);
+
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+
+  box.getSize(size);
+  box.getCenter(center);
+
+  const maxDim = Math.max(size.x,size.y,size.z);
+
+  if(!isFinite(maxDim) || maxDim <= 0){
+    throw new Error("Não consegui calcular o tamanho do GLB.");
+  }
+
+  /*
+    Move o objeto para que o centro geométrico fique em 0,0,0.
+  */
+  model.position.x -= center.x;
+  model.position.y -= center.y;
+  model.position.z -= center.z;
+
+  /*
+    Escala calculada para ficar bem visível no centro.
+  */
+  baseScale = 2.50 / maxDim;
+
+  resetTransform();
+
+  log(
+    "GLB pronto. Dimensões: " +
+    size.x.toFixed(2)+" x "+
+    size.y.toFixed(2)+" x "+
+    size.z.toFixed(2)
+  );
+}
+
+function clearCurrentModel(){
+  if(model){
+    modelRoot.remove(model);
+  }
+  model = null;
+  modelReady = false;
+  loadedModelIndex = -1;
+}
+
+function loadViewerModel(index){
+  if(index < 0 || index >= MODELS.length || modelLoading) return;
+
+  if(modelReady && loadedModelIndex === index){
+    if(activeTargetIndex === index && !waitingForRearm && !dioramaOpen) openDiorama();
+    return;
+  }
+
+  modelLoading = true;
+  retryBtn.style.display = "none";
+  setStatus("Baixando " + MODEL_NAMES[index] + "...");
+
+  const loader = new THREE.GLTFLoader();
+  const dracoLoader = new THREE.DRACOLoader();
+  dracoLoader.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/libs/draco/");
+  dracoLoader.setDecoderConfig({type:"js"});
+  loader.setDRACOLoader(dracoLoader);
+
+  loader.load(
+    MODELS[index] + "?v=" + Date.now(),
+    gltf=>{
+      try{
+        clearCurrentModel();
+        model = gltf.scene;
+
+        model.traverse(obj=>{
+          if(obj.isMesh){
+            obj.visible = true;
+            obj.frustumCulled = false;
+            if(obj.material){
+              const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+              materials.forEach(mat=>{
+                if("side" in mat) mat.side = THREE.DoubleSide;
+                mat.needsUpdate = true;
+              });
+            }
+          }
+        });
+
+        modelRoot.add(model);
+        centerAndFitModel();
+        modelRoot.visible = false;
+        modelReady = true;
+        loadedModelIndex = index;
+        modelLoading = false;
+
+        log(MODEL_NAMES[index] + " carregado.");
+
+        if(activeTargetIndex === index && targetSeen && !waitingForRearm && !dioramaOpen){
+          setStatus(MODEL_NAMES[index] + " pronto. Abrindo diorama...");
+          openDiorama();
+        }else{
+          setStatus("Agora aponte a câmera para uma das imagens.");
+        }
+      }catch(err){
+        modelLoading = false;
+        log("Erro preparando GLB: "+err.message);
+        setStatus("Erro ao preparar o cenário 3D.");
+        retryBtn.style.display = "block";
+      }
+    },
+    progress=>{
+      if(progress.total > 0 && activeTargetIndex === index){
+        const pct = Math.round((progress.loaded/progress.total)*100);
+        setStatus("Baixando " + MODEL_NAMES[index] + "... " + pct + "%");
+      }
+    },
+    err=>{
+      modelLoading = false;
+      console.error(err);
+      log("Erro GLTFLoader: " + MODEL_NAMES[index]);
+      setStatus("Erro ao baixar " + MODEL_NAMES[index] + ".");
+      retryBtn.style.display = "block";
+    }
+  );
+}
+
+/* ======================================================
+   MINDAR: SOMENTE RECONHECIMENTO
+   ====================================================== */
+
+async function startMindAR(){
+  if(arStarted) return;
+
+  try{
+    arStarted = true;
+
+    setStatus("Cenário pronto. Abrindo câmera...");
+
+    const system = arScene.systems["mindar-image-system"];
+
+    if(!system || typeof system.start !== "function"){
+      throw new Error("MindAR ainda não está disponível.");
+    }
+
+    await system.start();
+
+  }catch(err){
+    arStarted = false;
+    log("Erro MindAR: "+err.message);
+    setStatus("Erro ao iniciar câmera.");
+    retryBtn.style.display = "block";
+  }
+}
+
+function iniciarExperiencia(){
+  if(renderer) return;
+
+  try{
+    log("JavaScript iniciado.");
+    log("THREE: " + (window.THREE ? "OK" : "FALHOU"));
+    log("GLTFLoader: " + (window.THREE && THREE.GLTFLoader ? "OK" : "FALHOU"));
+    log("DRACOLoader: " + (window.THREE && THREE.DRACOLoader ? "OK" : "FALHOU"));
+
+    setStatus("Preparando experiência...");
+    initViewer();
+    setStatus("Abrindo câmera...");
+    startMindAR();
+  }catch(err){
+    log("Erro inicial: " + err.message);
+    setStatus("Erro ao preparar experiência.");
+    retryBtn.style.display = "block";
+  }
+}
+
+if(arScene.hasLoaded){
+  iniciarExperiencia();
+}else{
+  arScene.addEventListener("loaded",iniciarExperiencia,{once:true});
+}
+
+/* fallback para Androids em que o evento loaded pode se perder */
+setTimeout(()=>{
+  if(!renderer){
+    log("Fallback de inicialização acionado.");
+    iniciarExperiencia();
+  }
+},2000);
+
+arScene.addEventListener("arReady",()=>{
+  arReady = true;
+
+  statusEl.classList.add("ready");
+  setStatus("Agora aponte a câmera para uma das imagens.");
+
+  setScannerUIVisible(true);
+  forceVideoVisible();
+
+  log("MindAR pronto.");
+});
+
+arScene.addEventListener("arError",()=>{
+  arStarted = false;
+  arReady = false;
+
+  setStatus("Erro ao iniciar câmera/AR.");
+  retryBtn.style.display = "block";
+});
+
+/* ======================================================
+   ABRIR O DIORAMA
+   ====================================================== */
+
+function openDiorama(){
+  if(!modelReady || dioramaOpen || waitingForRearm) return;
+
+  dioramaOpen = true;
+
+  resetTransform();
+
+  modelRoot.visible = true;
+
+  /*
+    O rastreamento continua ativo, mas os marcadores do scanner
+    ficam escondidos enquanto o diorama está aberto.
+  */
+  setScannerUIVisible(false);
+
+  canvas.style.display = "block";
+  zoomControls.style.display = "flex";
+  exitBtn.style.display = "block";
+
+  /*
+    Render imediato, além do loop.
+  */
+  renderer.render(viewerScene,viewerCamera);
+
+  setStatus("1 dedo gira • 2 dedos movem • − / + zoom");
+
+  log("Diorama VISÍVEL no canvas independente.");
+}
+
+function closeDiorama(){
+  if(!dioramaOpen) return;
+
+  dioramaOpen = false;
+
+  /*
+    Como o MindAR continuou rastreando enquanto o diorama estava aberto,
+    sabemos se a imagem ainda está na câmera.
+  */
+  waitingForRearm = targetSeen;
+
+  activePointers.clear();
+  gestureMode = 0;
+
+  if(openTimer){
+    clearTimeout(openTimer);
+    openTimer = null;
+  }
+
+  modelRoot.visible = false;
+
+  /*
+    Limpa o canvas antes de escondê-lo.
+  */
+  renderer.clear();
+
+  canvas.style.display = "none";
+  zoomControls.style.display = "none";
+  exitBtn.style.display = "none";
+
+  /*
+    Os marcadores do scanner reaparecem imediatamente.
+    O motor do MindAR nunca foi pausado.
+  */
+  setScannerUIVisible(true);
+
+  if(waitingForRearm){
+    setStatus("Afaste a câmera da imagem e aponte novamente.");
+  }else{
+    setStatus("Agora aponte a câmera para uma das imagens.");
+  }
+
+  log("Diorama fechado.");
+}
+
+/* ======================================================
+   LEITOR UNIVERSAL
+   target 0 = Bruxa
+   target 1 = Castelo
+   target 2 = Vila
+   target 3 = Cemitério
+   ====================================================== */
+
+targets.forEach((target,index)=>{
+  target.addEventListener("targetFound",()=>{
+    activeTargetIndex = index;
+    targetSeen = true;
+
+    if(lostTimer){
+      clearTimeout(lostTimer);
+      lostTimer = null;
+    }
+
+    if(waitingForRearm || dioramaOpen) return;
+
+    setStatus(MODEL_NAMES[index] + " reconhecido.");
+
+    if(modelReady && loadedModelIndex === index){
+      if(openTimer) clearTimeout(openTimer);
+      openTimer = setTimeout(()=>{
+        if(activeTargetIndex === index && targetSeen && !waitingForRearm && !dioramaOpen){
+          openDiorama();
+        }
+      },300);
+    }else if(!modelLoading){
+      loadViewerModel(index);
+    }
+  });
+
+  target.addEventListener("targetLost",()=>{
+    if(activeTargetIndex !== index) return;
+
+    if(lostTimer) clearTimeout(lostTimer);
+
+    lostTimer = setTimeout(()=>{
+      if(activeTargetIndex === index){
+        activeTargetIndex = -1;
+        targetSeen = false;
+      }
+
+      if(openTimer){
+        clearTimeout(openTimer);
+        openTimer = null;
+      }
+
+      if(waitingForRearm){
+        waitingForRearm = false;
+        setScannerUIVisible(true);
+        setStatus("Agora aponte para outra imagem.");
+        log("Sistema rearmado.");
+      }else if(!dioramaOpen && !modelLoading){
+        setStatus("Agora aponte a câmera para uma das imagens.");
+      }
+
+      lostTimer = null;
+    },250);
+  });
+});
+
+/* ======================================================
+   CONTROLE DO DIORAMA
+   1 dedo  = girar
+   2 dedos = mover
+   ====================================================== */
+
+function pointerCenter(){
+  const pts = Array.from(activePointers.values());
+
+  if(pts.length === 1){
+    return {x:pts[0].x, y:pts[0].y};
+  }
+
+  if(pts.length >= 2){
+    return {
+      x:(pts[0].x + pts[1].x) / 2,
+      y:(pts[0].y + pts[1].y) / 2
+    };
+  }
+
+  return {x:0,y:0};
+}
+
+function resetGestureReference(){
+  const count = activePointers.size;
+
+  if(count === 0){
+    gestureMode = 0;
+    return;
+  }
+
+  gestureMode = count >= 2 ? 2 : 1;
+
+  const c = pointerCenter();
+  lastGestureX = c.x;
+  lastGestureY = c.y;
+}
+
+canvas.addEventListener("pointerdown",e=>{
+  if(!dioramaOpen) return;
+
+  e.preventDefault();
+
+  activePointers.set(e.pointerId,{
+    x:e.clientX,
+    y:e.clientY
+  });
+
+  try{
+    canvas.setPointerCapture(e.pointerId);
+  }catch(_){}
+
+  /*
+    Sempre que entra um novo dedo, reiniciamos a referência.
+    Isso evita o "pulo" ao passar de 1 para 2 dedos.
+  */
+  resetGestureReference();
+
+},{passive:false});
+
+canvas.addEventListener("pointermove",e=>{
+  if(!dioramaOpen || !activePointers.has(e.pointerId)) return;
+
+  e.preventDefault();
+
+  activePointers.set(e.pointerId,{
+    x:e.clientX,
+    y:e.clientY
+  });
+
+  const count = activePointers.size;
+  const c = pointerCenter();
+
+  /*
+    Se a quantidade de dedos mudou, apenas recalibra.
+    Não aplica movimento neste frame.
+  */
+  const newMode = count >= 2 ? 2 : 1;
+
+  if(newMode !== gestureMode){
+    resetGestureReference();
+    return;
+  }
+
+  const dx = c.x - lastGestureX;
+  const dy = c.y - lastGestureY;
+
+  if(newMode === 1){
+    /*
+      1 DEDO:
+      visualização/rotação.
+      Horizontal = rotação 360° contínua.
+      Vertical = inclinação limitada.
+    */
+    rotY += dx * 0.50;
+
+    rotX += dy * 0.25;
+    rotX = Math.max(-60,Math.min(60,rotX));
+
+  }else{
+    /*
+      2 DEDOS:
+      deslocamento do diorama.
+      A distância entre os dedos NÃO controla zoom.
+    */
+    panX += dx * PAN_SPEED;
+    panY -= dy * PAN_SPEED;
+
+    /*
+      Limites para impedir que o cenário seja jogado
+      completamente para fora da tela.
+    */
+    panX = Math.max(-PAN_LIMIT_X,Math.min(PAN_LIMIT_X,panX));
+    panY = Math.max(-PAN_LIMIT_Y,Math.min(PAN_LIMIT_Y,panY));
+  }
+
+  lastGestureX = c.x;
+  lastGestureY = c.y;
+
+  applyTransform();
+
+},{passive:false});
+
+function removePointer(e){
+  if(!activePointers.has(e.pointerId)) return;
+
+  e.preventDefault();
+
+  activePointers.delete(e.pointerId);
+
+  try{
+    canvas.releasePointerCapture(e.pointerId);
+  }catch(_){}
+
+  /*
+    Ao tirar um dos dois dedos, recalibra o dedo que ficou.
+    Assim o modelo não dá nenhum salto antes de voltar à rotação.
+  */
+  resetGestureReference();
+}
+
+canvas.addEventListener("pointerup",removePointer,{passive:false});
+canvas.addEventListener("pointercancel",removePointer,{passive:false});
+canvas.addEventListener("pointerleave",e=>{
+  if(activePointers.has(e.pointerId) && e.buttons === 0){
+    removePointer(e);
+  }
+},{passive:false});
+
+/* ======================================================
+   ZOOM E SAIR
+   ====================================================== */
+
+function changeZoom(factor){
+  if(!dioramaOpen) return;
+
+  zoom *= factor;
+  zoom = Math.max(0.35,Math.min(4.0,zoom));
+
+  applyTransform();
+
+  /*
+    Atualização imediata.
+  */
+  renderer.render(viewerScene,viewerCamera);
+}
+
+zoomInBtn.addEventListener("click",e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  changeZoom(1.15);
+});
+
+zoomOutBtn.addEventListener("click",e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  changeZoom(1/1.15);
+});
+
+exitBtn.addEventListener("click",e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  closeDiorama();
+});
+
+/* ======================================================
+   RETRY
+   ====================================================== */
+
+retryBtn.addEventListener("click",()=>{
+  retryBtn.style.display = "none";
+
+  if(!renderer){
+    iniciarExperiencia();
+    return;
+  }
+
+  if(activeTargetIndex >= 0 && (!modelReady || loadedModelIndex !== activeTargetIndex)){
+    modelLoading = false;
+    loadViewerModel(activeTargetIndex);
+    return;
+  }
+
+  if(!arStarted){
+    startMindAR();
+  }
+});
+
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden){
+    setTimeout(forceVideoVisible,200);
+  }
+});
+
+setInterval(()=>{
+  if(arReady){
+    forceVideoVisible();
+  }
+},800);
+
+window.addEventListener("error",e=>{
+  log("JS ERRO: "+e.message);
+});
+
+window.addEventListener("unhandledrejection",e=>{
+  log("PROMISE ERRO: "+String(e.reason));
+});
+</script>
+
+</body>
+</html>
